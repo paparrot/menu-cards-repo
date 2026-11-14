@@ -7,7 +7,9 @@ let ings=new Set();
 try{ings=new Set(JSON.parse(localStorage.getItem(IKEY)||'[]'))}catch(e){}
 function saveIng(){try{localStorage.setItem(IKEY,JSON.stringify([...ings]))}catch(e){}mirror()}
 const idb=()=>new Promise((res,rej)=>{try{const r=indexedDB.open('menu-cards',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});
-function mirror(){const v=JSON.stringify({known:[...known],ings:[...ings]});idb().then(d=>{d.transaction('kv','readwrite').objectStore('kv').put(v,'state')}).catch(()=>{})}
+function tick(t){try{window.onTick&&window.onTick(t)}catch(e){}}
+const ask=m=>window.askConfirm?window.askConfirm(m):Promise.resolve(confirm(m));
+function mirror(){try{document.dispatchEvent(new CustomEvent('progress:save'))}catch(e){}const v=JSON.stringify({known:[...known],ings:[...ings]});idb().then(d=>{d.transaction('kv','readwrite').objectStore('kv').put(v,'state')}).catch(()=>{})}
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 idb().then(d=>new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})).then(v=>{
   if(!v||known.size||ings.size)return;
@@ -147,8 +149,8 @@ function render(){
       const v=inp.value.trim();if(!v)return;
       const r=Q.test(v);
       inp.classList.toggle('bad',r.s==='bad');
-      if(r.s==='bad'){say('bad','✗ '+r.m);inp.classList.remove('shake');void inp.offsetWidth;inp.classList.add('shake');inp.select();return}
-      inp.value='';if(r.first){ings.add(c.d+'||'+c.i[r.i].n);saveIng();refreshIng()}draw();
+      if(r.s==='bad'){tick('bad');say('bad','✗ '+r.m);inp.classList.remove('shake');void inp.offsetWidth;inp.classList.add('shake');inp.select();return}
+      inp.value='';tick('ok');if(r.first){ings.add(c.d+'||'+c.i[r.i].n);saveIng();refreshIng()}draw();
       say('ok',Q.count()===Q.total?'✓ Все ингредиенты названы!':'✓ '+r.m);
       inp.focus();
     };
@@ -159,7 +161,7 @@ function render(){
     draw();
   }
   $('flipbtn').onclick=flip;
-  const mark=ok=>{ok?known.add(c.d):known.delete(c.d);save();advance()};
+  const mark=ok=>{tick(ok?'yes':'no');ok?known.add(c.d):known.delete(c.d);save();advance()};
   $('yes').onclick=()=>mark(true);$('no').onclick=()=>mark(false);
   // swipe: right = know, left = repeat
   const sc=st.querySelector('.scene'),lyes=sc.querySelector('.swl-yes'),lno=sc.querySelector('.swl-no');
@@ -219,7 +221,7 @@ $('m-fwd').onclick=()=>setMode('fwd');$('m-rev').onclick=()=>setMode('rev');
 function setMode(m){mode=m;$('m-fwd').setAttribute('aria-pressed',m==='fwd');$('m-rev').setAttribute('aria-pressed',m==='rev');flipped=false;render()}
 $('onlyNew').onchange=e=>{onlyNew=e.target.checked;build(false)};
 $('shuf').onclick=()=>build(true);
-$('reset').onclick=()=>{if(confirm('Сбросить все отметки: «Знаю» у блюд и выученные ингредиенты?')){known.clear();save();ings.clear();saveIng();build(false)}};
+$('reset').onclick=async()=>{if(await ask('Сбросить все отметки: «Знаю» у блюд и выученные ингредиенты?')){known.clear();save();ings.clear();saveIng();build(false)}};
 (function(){
   const dr=$('drawer'),mq=window.matchMedia?matchMedia('(max-width:767px)'):{matches:false};
   const open=()=>document.body.classList.contains('menu-open');
@@ -268,14 +270,14 @@ $('reset').onclick=()=>{if(confirm('Сбросить все отметки: «З
   };
   // import (from a file or from pasted text)
   const names=new Set(DATA.map(c=>c.d));
-  function applyImport(text){
+  async function applyImport(text){
     let o;try{o=JSON.parse(text)}catch(e){say('Не удалось прочитать данные: это не файл прогресса.');return}
     if(!o||!Array.isArray(o.known)||!Array.isArray(o.ings)){say('Это не файл прогресса.');return}
     const k=o.known.filter(x=>typeof x==='string'&&names.has(x));
     const g=o.ings.filter(x=>typeof x==='string'&&names.has(x.split('||')[0]));
     const skipped=(o.known.length-k.length)+(o.ings.length-g.length);
     const replace=$('bkmode').value==='replace';
-    if(replace&&!confirm('Заменить текущий прогресс данными из файла?'))return;
+    if(replace&&!(await ask('Заменить текущий прогресс данными из файла?')))return;
     if(replace){known=new Set(k);ings=new Set(g)}else{k.forEach(x=>known.add(x));g.forEach(x=>ings.add(x))}
     save();saveIng();build(false);
     say('Импортировано: блюд — '+k.length+', отмеченных ингредиентов — '+g.length+(skipped?'. Пропущено неизвестных записей: '+skipped:'')+'.');

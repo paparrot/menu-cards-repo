@@ -14,6 +14,7 @@ def main():
     css = (ROOT / 'css' / 'style.css').read_text(encoding='utf-8')
     cards = (ROOT / 'data' / 'cards.js').read_text(encoding='utf-8')
     app = (ROOT / 'js' / 'app.js').read_text(encoding='utf-8')
+    tgjs = (ROOT / 'js' / 'telegram.js').read_text(encoding='utf-8')
 
     def inline_images(m):
         paths = json.loads(m.group(1))
@@ -24,6 +25,7 @@ def main():
     html = html.replace('<link rel="stylesheet" href="css/style.css">', '<style>\n' + css + '</style>')
     html = html.replace('<script src="data/cards.js"></script>', '<script>\n' + cards + '</script>', 1)
     html = html.replace('<script src="js/app.js"></script>', '<script>\n' + app + '</script>', 1)
+    html = html.replace('<script src="js/telegram.js"></script>', '<script>\n' + tgjs + '</script>', 1)
     out = ROOT / 'dist' / 'menu-cards.html'
     out.parent.mkdir(exist_ok=True)
     out.write_text(html, encoding='utf-8')
